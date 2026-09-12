@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二维码生成器</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<style>
+body{font-family:sans-serif;background:#f5f5f5;padding:20px;margin:0;}
+.box{background:#fff;padding:20px;border-radius:12px;max-width:420px;margin:0 auto;box-shadow:0 2px 10px rgba(0,0,0,0.1);}
+h2{text-align:center;margin:0 0 15px 0;}
+textarea,input{width:100%;box-sizing:border-box;margin-bottom:10px;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;}
+button{width:100%;padding:12px;background:#0057ff;color:#fff;border:none;border-radius:8px;font-size:16px;margin-bottom:10px;cursor:pointer;}
+button.gray{background:#eef3fa;color:#1f3b5c;}
+#qr{text-align:center;margin-top:10px;min-height:210px;}
+#tag{color:#0057ff;font-size:14px;text-align:center;min-height:20px;margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div class="box">
+<h2>二维码生成器</h2>
+<textarea id="main" rows="3" placeholder="输入内容，如 ASSET-001 03X 441"></textarea>
+<input id="note" placeholder="备注（仅水印，不进入扫码结果）">
+<button id="gen">生成二维码</button>
+<div id="qr"></div>
+<div id="tag"></div>
+<button id="dl" class="gray">下载PNG（含备注水印）</button>
+</div>
+<script>
+function $(id){return document.getElementById(id);}
+function findHits(t){var r=[];(t.match(/03X|04X|441|426/gi)||[]).forEach(function(x){if(r.indexOf(x.toUpperCase())===-1)r.push(x.toUpperCase());});return r;}
+function gen(){var t=$('main').value.trim();if(!t){alert('请输入内容');return;}$('qr').innerHTML='';new QRCode($('qr'),{text:t,width:200,height:200,correctLevel:QRCode.CorrectLevel.H});var h=findHits(t);$('tag').textContent=h.length?'自动识别到标识：'+h.join('、'):'';}
+function dl(){setTimeout(function(){var box=$('qr'),cv=box.querySelector('canvas'),img=box.querySelector('img'),src=null;if(cv&&cv.width>0)src=cv;else if(img&&img.src){var c=document.createElement('canvas');c.width=img.naturalWidth||200;c.height=img.naturalHeight||200;c.getContext('2d').drawImage(img,0,0,c.width,c.height);src=c;}if(!src){alert('请先生成二维码');return;}var h=findHits($('main').value),u=$('note').value.trim(),lines=[];if(h.length)lines.push('标识：'+h.join('、'));if(u)lines.push(u);var out=src;if(lines.length){var pd=24,tp=24,ar=Math.max(80,28*lines.length+40),W=src.width+pd*2,H=src.height+pd*2+tp+ar;var nc=document.createElement('canvas');nc.width=W;nc.height=H;var x=nc.getContext('2d');x.fillStyle='#ffffff';x.fillRect(0,0,W,H);x.drawImage(src,pd,pd+tp);x.fillStyle='#0b1a33';x.textAlign='center';x.font='bold 16px sans-serif';x.fillText('备注',W/2,pd+tp+src.height+26);x.font='14px sans-serif';lines.join('\n').split('\n').forEach(function(l,i){x.fillText(l,pd+10,pd+tp+src.height+50+i*22);});out=nc;}out.toBlob(function(blob){var url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='qrcode.png';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);},'image/png');},400);}
+$('gen').addEventListener('click',gen);
+$('dl').addEventListener('click',dl);
+</script>
+</body>
+</html>
+
