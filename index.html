@@ -2,38 +2,196 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>二维码生成器</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>批量二维码生成器</title>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <style>
-body{font-family:sans-serif;background:#f5f5f5;padding:20px;margin:0;}
-.box{background:#fff;padding:20px;border-radius:12px;max-width:420px;margin:0 auto;box-shadow:0 2px 10px rgba(0,0,0,0.1);}
-h2{text-align:center;margin:0 0 15px 0;}
-textarea,input{width:100%;box-sizing:border-box;margin-bottom:10px;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;}
-button{width:100%;padding:12px;background:#0057ff;color:#fff;border:none;border-radius:8px;font-size:16px;margin-bottom:10px;cursor:pointer;}
-button.gray{background:#eef3fa;color:#1f3b5c;}
-#qr{text-align:center;margin-top:10px;min-height:210px;}
-#tag{color:#0057ff;font-size:14px;text-align:center;min-height:20px;margin-bottom:10px;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f8fafc;padding:16px;color:#1e293b}
+  .card{background:#fff;border-radius:16px;padding:20px;max-width:620px;margin:0 auto;box-shadow:0 4px 6px rgba(0,0,0,0.04)}
+  h2{font-size:20px;margin-bottom:12px}
+  textarea,input,select{width:100%;padding:12px;margin-bottom:12px;border:1px solid #e2e8f0;border-radius:8px;font-size:15px;background:#fff}
+  textarea{min-height:100px;resize:vertical}
+  .row{display:flex;gap:12px}.row>div{flex:1}
+  label{display:block;margin-bottom:4px;font-size:13px;font-weight:500;color:#475569}
+  button{width:100%;padding:14px;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:10px}
+  .btn-primary{background:#6366f1;color:#fff}
+  .btn-secondary{background:#f1f5f9;color:#1e293b}
+  #status{text-align:center;font-size:14px;color:#64748b;margin:10px 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;margin-top:16px}
+  .item{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;text-align:center}
+  .no{font-size:12px;color:#64748b;margin-bottom:6px}
+  .qr{display:flex;justify-content:center;align-items:center;margin-bottom:6px}
+  /* 让canvas在页面上显示为用户设定的尺寸（实际像素是双倍） */
+  .qr canvas{max-width:100%;height:auto}
+  .tags{font-size:12px;color:#6366f1;margin-bottom:2px}
+  .wm{font-size:12px;color:#78716c;margin-bottom:8px}
+  .btn-save{width:100%;padding:10px;background:#f1f5f9;border:none;border-radius:6px;font-size:14px;font-weight:500;cursor:pointer}
+
+  /* 遮罩 */
+  #overlay{
+    position:fixed;top:0;left:0;right:0;bottom:0;
+    background:rgba(0,0,0,0.65);
+    backdrop-filter:blur(4px);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    z-index:9999;
+  }
+  #overlay.show{display:flex}
+  #overlay .close-hint{
+    color:#fff;font-size:14px;margin-bottom:16px;
+    background:rgba(255,255,255,0.15);
+    padding:8px 20px;border-radius:20px;cursor:default;
+  }
+  #overlay img{
+    max-width:85vw;max-height:70vh;border-radius:12px;
+    background:#fff;padding:12px;box-shadow:0 8px 30px rgba(0,0,0,0.3);
+  }
+  #overlay .tip{color:#ccc;font-size:13px;margin-top:16px;text-align:center}
 </style>
 </head>
 <body>
-<div class="box">
-<h2>二维码生成器</h2>
-<textarea id="main" rows="3" placeholder="输入内容，如 ASSET-001 03X 441"></textarea>
-<input id="note" placeholder="备注（仅水印，不进入扫码结果）">
-<button id="gen">生成二维码</button>
-<div id="qr"></div>
-<div id="tag"></div>
-<button id="dl" class="gray">下载PNG（含备注水印）</button>
+<div class="card">
+  <h2>批量二维码生成器</h2>
+  <textarea id="batch" placeholder="每行一条内容&#10;支持备注：内容 | 备注&#10;自动识别 03X/04X/441/426"></textarea>
+  <div class="row">
+    <div><label>尺寸(px)</label><input id="size" value="220"></div>
+    <div><label>回车后缀</label>
+      <select id="suffix"><option value="">无</option><option value="\n">LF</option></select>
+    </div>
+  </div>
+  <div class="row">
+    <div><label>前景色</label><input id="fg" value="#000000"></div>
+    <div><label>背景色</label><input id="bg" value="#ffffff"></div>
+  </div>
+  <button class="btn-primary" id="gen">批量生成</button>
+  <button class="btn-secondary" id="clear">清空结果</button>
+  <div id="status"></div>
+  <div class="grid" id="grid"></div>
 </div>
+
+<!-- 遮罩 -->
+<div id="overlay">
+  <div class="close-hint">点击空白处关闭</div>
+  <img id="previewImg" src="" alt="长按保存">
+  <div class="tip">👆 长按图片即可保存到相册</div>
+</div>
+
 <script>
-function $(id){return document.getElementById(id);}
-function findHits(t){var r=[];(t.match(/03X|04X|441|426/gi)||[]).forEach(function(x){if(r.indexOf(x.toUpperCase())===-1)r.push(x.toUpperCase());});return r;}
-function gen(){var t=$('main').value.trim();if(!t){alert('请输入内容');return;}$('qr').innerHTML='';new QRCode($('qr'),{text:t,width:200,height:200,correctLevel:QRCode.CorrectLevel.H});var h=findHits(t);$('tag').textContent=h.length?'自动识别到标识：'+h.join('、'):'';}
-function dl(){setTimeout(function(){var box=$('qr'),cv=box.querySelector('canvas'),img=box.querySelector('img'),src=null;if(cv&&cv.width>0)src=cv;else if(img&&img.src){var c=document.createElement('canvas');c.width=img.naturalWidth||200;c.height=img.naturalHeight||200;c.getContext('2d').drawImage(img,0,0,c.width,c.height);src=c;}if(!src){alert('请先生成二维码');return;}var h=findHits($('main').value),u=$('note').value.trim(),lines=[];if(h.length)lines.push('标识：'+h.join('、'));if(u)lines.push(u);var out=src;if(lines.length){var pd=24,tp=24,ar=Math.max(80,28*lines.length+40),W=src.width+pd*2,H=src.height+pd*2+tp+ar;var nc=document.createElement('canvas');nc.width=W;nc.height=H;var x=nc.getContext('2d');x.fillStyle='#ffffff';x.fillRect(0,0,W,H);x.drawImage(src,pd,pd+tp);x.fillStyle='#0b1a33';x.textAlign='center';x.font='bold 16px sans-serif';x.fillText('备注',W/2,pd+tp+src.height+26);x.font='14px sans-serif';lines.join('\n').split('\n').forEach(function(l,i){x.fillText(l,pd+10,pd+tp+src.height+50+i*22);});out=nc;}out.toBlob(function(blob){var url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='qrcode.png';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);},'image/png');},400);}
-$('gen').addEventListener('click',gen);
-$('dl').addEventListener('click',dl);
+function parseRows(txt){
+  return txt.split('\n').map(function(l){
+    l=l.trim(); if(!l)return null;
+    var p=l.split('|'); return {content:p[0].trim(),note:p[1]?p[1].trim():''};
+  }).filter(Boolean);
+}
+function findHits(s){
+  var m=s.match(/03x|04x|441|426/gi);
+  return m?m.map(function(x){return x.toUpperCase()}):[];
+}
+function buildPayload(str,suf){
+  str=str.replace(/\s+/g,'-');
+  return suf?str+suf:str;
+}
+function esc(s){return s.replace(/</g,'&lt;')}
+
+var lastCanvases=[];
+var overlay=document.getElementById('overlay');
+var previewImg=document.getElementById('previewImg');
+
+overlay.addEventListener('click',function(e){
+  if(e.target===overlay || e.target.classList.contains('close-hint')){
+    overlay.style.display='none';
+  }
+});
+
+function makeCard(opts){
+  return new Promise(function(resolve){
+    var scale=2; // 高清倍数
+    var dispSize=opts.size;          // 用户设定的显示尺寸
+    var realSize=dispSize*scale;     // 实际绘制尺寸
+
+    var wrap=document.createElement('div');
+    new QRCode(wrap,{
+      text:opts.payload,
+      width:realSize,
+      height:realSize,
+      colorDark:opts.fg,
+      colorLight:opts.bg,
+      correctLevel:QRCode.CorrectLevel.H
+    });
+    setTimeout(function(){
+      var cv=wrap.querySelector('canvas');
+      if(!cv){resolve(null);wrap.remove();return;}
+      var fc=document.createElement('canvas'),ctx=fc.getContext('2d');
+      var pad=16*scale;            // 边距也翻倍
+      var fs=14*scale;             // 字体大小翻倍
+      var wmH=opts.note?fs+8*scale:0;
+      var hitsH=opts.hits&&opts.hits.length?fs+8*scale:0;
+      fc.width=cv.width+pad*2;
+      fc.height=cv.height+pad*2+24*scale+wmH+hitsH;
+      ctx.fillStyle='#ffffff';ctx.fillRect(0,0,fc.width,fc.height);
+      ctx.drawImage(cv,pad,pad);
+      var ty=cv.height+pad+16*scale;
+      if(opts.hits&&opts.hits.length){
+        ctx.fillStyle='#6366f1';ctx.font=fs+'px Arial';ctx.textAlign='center';
+        ctx.fillText('标识：'+opts.hits.join('、'),fc.width/2,ty);ty+=fs+12*scale;
+      }
+      if(opts.note){
+        ctx.fillStyle='#78716c';ctx.font=fs+'px Arial';ctx.textAlign='center';
+        ctx.fillText('备注：'+opts.note,fc.width/2,ty);
+      }
+      // 设置CSS显示尺寸（缩小回用户设定的大小）
+      fc.style.width=dispSize+'px';
+      fc.style.height=(fc.height*(dispSize/fc.width))+'px'; // 保持比例
+      resolve(fc);wrap.remove();
+    },200);
+  });
+}
+
+document.getElementById('gen').addEventListener('click',function(){
+  var rows=parseRows(document.getElementById('batch').value);
+  if(!rows.length){alert('请输入内容');return;}
+  var grid=document.getElementById('grid'),statusEl=document.getElementById('status');
+  grid.innerHTML='';lastCanvases=[];
+  var size=parseInt(document.getElementById('size').value)||220;
+  var fg=document.getElementById('fg').value,bg=document.getElementById('bg').value,suf=document.getElementById('suffix').value;
+  var concurrency=6,i=0,done=0;
+  function next(){
+    if(i>=rows.length)return;
+    var idx=i++;var row=rows[idx];
+    var hits=findHits(row.content),payload=buildPayload(row.content,suf);
+    makeCard({payload:payload,hits:hits,note:row.note,size:size,fg:fg,bg:bg}).then(function(canvas){
+      done++;statusEl.textContent='生成中 '+done+'/'+rows.length;
+      if(canvas){
+        var item=document.createElement('div');item.className='item';
+        var no=document.createElement('div');no.className='no';no.textContent='第'+(idx+1)+'条';
+        var qr=document.createElement('div');qr.className='qr';qr.appendChild(canvas);
+        var tags=document.createElement('div');tags.className='tags';tags.innerHTML=hits.length?'标识：'+esc(hits.join('、')):'';
+        var wm=document.createElement('div');wm.className='wm';wm.textContent=row.note?('备注：'+row.note):'';
+        var btn=document.createElement('button');btn.className='btn-save';btn.textContent='保存此张';
+        btn.onclick=function(){
+          var url=canvas.toDataURL('image/png');
+          previewImg.src=url;
+          overlay.style.display='flex';
+        };
+        item.appendChild(no);item.appendChild(qr);if(hits.length)item.appendChild(tags);if(row.note)item.appendChild(wm);item.appendChild(btn);
+        grid.appendChild(item);lastCanvases[idx]=canvas;
+      }
+      if(done===rows.length)statusEl.textContent='完成，共 '+rows.length+' 条';
+      next();
+    });
+  }
+  for(var k=0;k<concurrency;k++)next();
+});
+
+document.getElementById('clear').addEventListener('click',function(){
+  document.getElementById('grid').innerHTML='';
+  lastCanvases=[];
+  document.getElementById('status').textContent='';
+  overlay.style.display='none';
+});
 </script>
 </body>
 </html>
-
