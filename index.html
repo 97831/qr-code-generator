@@ -87,7 +87,7 @@ function parseRows(txt){
   }).filter(Boolean);
 }
 function findHits(s){
-  var m=s.match(/03x|04x|441|426/gi);
+  var m=s.match(/03x|04x|441|426|01x|0065|0124/gi);
   return m?m.map(function(x){return x.toUpperCase()}):[];
 }
 function buildPayload(str,suf){
