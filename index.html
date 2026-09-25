@@ -55,7 +55,7 @@
 <body>
 <div class="card">
   <h2>批量二维码生成器</h2>
-  <textarea id="batch" placeholder="每行一条内容&#10;支持备注：内容 | 备注&#10;自动识别 03X/04X/441/426"></textarea>
+  <textarea id="batch" placeholder="每行一条内容&#10;支持备注：内容 | 备注&#10;自动识别 03X/04X/441/426/01X/0065/0124/02X"></textarea>
   <div class="row">
     <div><label>尺寸(px)</label><input id="size" value="220"></div>
     <div><label>回车后缀</label>
@@ -87,7 +87,7 @@ function parseRows(txt){
   }).filter(Boolean);
 }
 function findHits(s){
-  var m=s.match(/03x|04x|441|426|01x|0065|0124/gi);
+  var m=s.match(/03x|04x|441|426|01x|0065|0124|02X/gi);
   return m?m.map(function(x){return x.toUpperCase()}):[];
 }
 function buildPayload(str,suf){
